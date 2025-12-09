@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>스크래치 카드 및 도구 세트 (최종)</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            width: 100vw;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: #000; /* 여백을 검은색으로 처리 */
+        }
+
+        #canvas-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 10;
+            
+            /* 다크 모드 이미지 (GitHub URL) */
+            background-image: url('https://github.com/user-attachments/assets/7900f748-e60d-4362-a1cd-d9b97c3621da');
+            
+            /* 🆕 이미지가 잘리지 않도록 contain 사용 */
+            background-size: contain; 
+            background-position: center;
+            background-repeat: no-repeat;
+            background-attachment: fixed; 
+        }
+
+        #scratchCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 10;
+            user-select: none;
+        }
+        
+        #controls {
+            position: fixed;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%) translateY(85%); 
+            
+            height: 70px; 
+            padding: 10px 30px;
+            background-color: rgba(30, 30, 30, 0.9); 
+            border-radius: 20px 20px 0 0; 
+            
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 20px;
+            z-index: 200; 
+            
+            transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+            box-shadow: 0 -5px 15px rgba(0,0,0,0.5);
+        }
+
+        #controls:hover {
+            transform: translateX(-50%) translateY(0%); 
+        }
+
+        #controls::before {
+            content: '';
+            position: absolute;
+            top: -20px; 
+            left: 0;
+            width: 100%;
+            height: 20px;
+            background: transparent;
+        }
+
+        #brushSize {
+            width: 150px;
+            margin-right: 15px;
+            cursor: pointer;
+        }
+        
+        /* 버튼 스타일 */
+        #toggleLoupe, #toggleBasic, #toggleTexture, #toggleEffect, #resetButton {
+            width: 45px; 
+            height: 45px; 
+            padding: 0;
+            background-color: #444;
+            color: white;
+            border: 2px solid #555;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 22px; 
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: all 0.2s;
+        }
+
+        #toggleLoupe:hover, #toggleBasic:hover, #toggleTexture:hover, #toggleEffect:hover, #resetButton:hover {
+            background-color: #555;
+            transform: translateY(-2px);
+            border-color: #777;
+        }
+        
+        .active-tool {
+            background-color: #3498db !important; 
+            border-color: #3498db !important;
+            box-shadow: 0 0 10px rgba(52, 152, 219, 0.5);
+        }
+
+        /* 돋보기 (Loupe) 스타일 */
+        #loupe {
+            position: fixed;
+            width: 300px; 
+            height: 300px; 
+            border-radius: 50%;
+            border: none; 
+            box-shadow: inset 0 0 50px 30px rgba(0, 0, 0, 0.8), 
+                        0 0 20px rgba(0,0,0,0.5); 
+            overflow: hidden;
+            pointer-events: none; 
+            z-index: 100;
+            display: none;
+            background-color: transparent;
+        }
+
+        /* 돋보기 내부 배경 (중립 이미지) */
+        #loupe-background {
+            background-image: url('https://i.postimg.cc/RFBNXcbT/junglib.png');
+            
+            /* 🆕 돋보기 내부 이미지도 잘리지 않도록 contain 적용 */
+            background-size: contain;         
+            background-position: center;    
+            background-attachment: fixed;   
+            background-repeat: no-repeat;
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            z-index: -1; 
+        }
+        
+        label {
+            color: #ddd;
+            font-size: 14px;
+            font-weight: bold;
+        }
+        #currentSize {
+            color: #ddd;
+            font-weight: bold;
+            width: 30px;
+            text-align: right;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="canvas-container">
+        <canvas id="scratchCanvas"></canvas>
+    </div>
+
+    <div id="loupe">
+        <div id="loupe-background"></div> 
+    </div>
+
+    <div id="controls">
+        <button id="toggleBasic" title="기본 브러시">🖌️</button> 
+        <button id="toggleTexture" title="텍스처 브러시">⚫</button> 
+        <button id="toggleEffect" title="이펙트 브러시">💥</button> 
+
+        <div style="width: 1px; height: 30px; background: #555; margin: 0 5px;"></div>
+
+        <button id="toggleLoupe" title="돋보기 (중립 페이지)">🔎</button>
+
+        <div style="width: 1px; height: 30px; background: #555; margin: 0 5px;"></div>
+
+        <label for="brushSize">크기</label>
+        <input type="range" id="brushSize" name="brushSize" min="10" max="100" value="50">
+        <span id="currentSize">50</span>
+
+        <div style="width: 1px; height: 30px; background: #555; margin: 0 5px;"></div>
+
+        <button id="resetButton" title="초기화">🔄</button> 
+    </div>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const canvasContainer = document.getElementById('canvas-container');
+            const canvas = document.getElementById('scratchCanvas');
+            const ctx = canvas.getContext('2d');
+
+            let lightModeImage = new Image();
+            lightModeImage.crossOrigin = "Anonymous"; 
+            lightModeImage.src = 'https://i.imgur.com/wCB3iXx.jpeg';
+
+            const sizeInput = document.getElementById('brushSize');
+            const currentSizeSpan = document.getElementById('currentSize');
+            let brushRadius = parseInt(sizeInput.value);
+
+            const resetButton = document.getElementById('resetButton');
+            const toggleBasicButton = document.getElementById('toggleBasic');
+            const toggleTextureButton = document.getElementById('toggleTexture');
+            const toggleEffectButton = document.getElementById('toggleEffect');
+            const toggleLoupeButton = document.getElementById('toggleLoupe');
+            
+            const loupe = document.getElementById('loupe');
+            const loupeSize = 300; 
+
+            let isBasicBrush = true; 
+            let isTextureBrush = false; 
+            let isEffectBrush = false; 
+            let isLoupeActive = false; 
+            let isDrawing = false;
+            let imageLoaded = false;
+            
+            // **고화질 렌더링을 위한 캔버스 초기화 함수 (Contain 로직 적용)**
+            function initializeCanvas() {
+                const dpr = window.devicePixelRatio || 1;
+                const displayWidth = canvasContainer.offsetWidth;
+                const displayHeight = canvasContainer.offsetHeight;
+
+                canvas.style.width = displayWidth + 'px';
+                canvas.style.height = displayHeight + 'px';
+
+                canvas.width = displayWidth * dpr;
+                canvas.height = displayHeight * dpr;
+
+                ctx.scale(dpr, dpr);
+                ctx.imageSmoothingEnabled = false; 
+
+                if (imageLoaded) {
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    
+                    const img = lightModeImage;
+                    const canvasRatio = displayWidth / displayHeight;
+                    const imgRatio = img.width / img.height;
+
+                    let drawWidth, drawHeight, offsetX, offsetY;
+                    
+                    // 🆕 Contain 로직: 이미지가 화면 안에 쏙 들어오게 계산 (잘림 방지)
+                    if (imgRatio > canvasRatio) { 
+                        // 이미지가 화면보다 더 납작함 -> 너비를 화면에 맞춤 (위아래 여백)
+                        drawWidth = displayWidth;
+                        drawHeight = displayWidth / imgRatio;
+                        offsetX = 0;
+                        offsetY = (displayHeight - drawHeight) / 2;
+                    } else { 
+                        // 이미지가 화면보다 더 홀쭉함 -> 높이를 화면에 맞춤 (좌우 여백)
+                        drawHeight = displayHeight;
+                        drawWidth = displayHeight * imgRatio;
+                        offsetX = (displayWidth - drawWidth) / 2;
+                        offsetY = 0;
+                    }
+
+                    ctx.drawImage(img, offsetX, offsetY, drawWidth, drawHeight);
+                    ctx.globalCompositeOperation = 'destination-out';
+                }
+                updateCursor();
+            }
+
+            function updateCursor() {
+                const cursorRadius = brushRadius;
+                const svgWidth = cursorRadius * 2 + 4;
+                const svgHeight = cursorRadius * 2 + 4;
+                const centerX = cursorRadius + 2;
+                const centerY = cursorRadius + 2;
+                const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${svgWidth}" height="${svgHeight}" viewBox="0 0 ${svgWidth} ${svgHeight}"><circle cx="${centerX}" cy="${centerY}" r="${cursorRadius}" stroke="white" stroke-width="2" fill="none"/></svg>`;
+                const encodedSvg = encodeURIComponent(svg);
+                const cursorOffsetX = centerX;
+                const cursorOffsetY = centerY;
+
+                if (isLoupeActive) {
+                    canvas.style.cursor = `none`;
+                    return;
+                }
+
+                if (isBasicBrush) {
+                    canvas.style.cursor = `url('data:image/svg+xml;utf8,${encodedSvg}') ${cursorOffsetX} ${cursorOffsetY}, auto`;
+                } else if (isTextureBrush || isEffectBrush) {
+                    canvas.style.cursor = 'crosshair'; 
+                } else {
+                    canvas.style.cursor = 'default';
+                }
+            }
+            
+            function toggleBrushState(type) {
+                isBasicBrush = false;
+                isTextureBrush = false;
+                isEffectBrush = false;
+
+                toggleBasicButton.classList.remove('active-tool');
+                toggleTextureButton.classList.remove('active-tool');
+                toggleEffectButton.classList.remove('active-tool');
+                
+                if (type === 'basic') {
+                    isBasicBrush = true;
+                    toggleBasicButton.classList.add('active-tool');
+                } else if (type === 'texture') {
+                    isTextureBrush = true;
+                    toggleTextureButton.classList.add('active-tool');
+                } else if (type === 'effect') {
+                    isEffectBrush = true;
+                    toggleEffectButton.classList.add('active-tool');
+                }
+                updateCursor();
+            }
+
+            toggleBasicButton.addEventListener('click', () => toggleBrushState('basic'));
+            toggleTextureButton.addEventListener('click', () => toggleBrushState('texture'));
+            toggleEffectButton.addEventListener('click', () => toggleBrushState('effect'));
+
+            toggleLoupeButton.addEventListener('click', () => {
+                isLoupeActive = !isLoupeActive; 
+                
+                if (isLoupeActive) {
+                     toggleLoupeButton.classList.add('active-tool');
+                     loupe.style.display = 'block';
+                     toggleBrushState(null); 
+                     canvas.style.pointerEvents = 'none'; 
+                } else {
+                     toggleLoupeButton.classList.remove('active-tool');
+                     loupe.style.display = 'none';
+                     toggleBrushState('basic'); 
+                     canvas.style.pointerEvents = 'auto';
+                }
+                updateCursor();
+            });
+            
+            resetButton.addEventListener('click', () => {
+                initializeCanvas(); 
+                toggleBrushState('basic');
+            });
+
+            let lastMouseX = -1, lastMouseY = -1;
+            canvas.addEventListener('mousedown', (e) => {
+                if (isLoupeActive) return; 
+                isDrawing = true;
+                if (isEffectBrush) {
+                    drawExplosion(e.clientX, e.clientY);
+                    isDrawing = false; 
+                }
+            });
+
+            canvas.addEventListener('mouseup', () => {
+                isDrawing = false;
+                lastMouseX = -1; lastMouseY = -1;
+            });
+
+            const handleMouseMove = (e) => {
+                const x = e.clientX;
+                const y = e.clientY;
+
+                if (isLoupeActive) {
+                    loupe.style.left = `${x - (loupeSize / 2)}px`;
+                    loupe.style.top = `${y - (loupeSize / 2)}px`;
+                    return;
+                }
+                
+                if (isDrawing && isEffectBrush) {
+                    drawPixelShard(x, y);
+                } else if (isDrawing) {
+                    if (lastMouseX !== -1) {
+                        drawSmooth(lastMouseX, lastMouseY, x, y);
+                    } else {
+                        drawAtPoint(x, y);
+                    }
+                }
+                lastMouseX = x;
+                lastMouseY = y;
+            };
+
+            document.body.addEventListener('mousemove', handleMouseMove);
+            
+            function drawSmooth(x1, y1, x2, y2) {
+                const distance = Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
+                const angle = Math.atan2(y2 - y1, x2 - x1);
+                
+                for (let i = 0; i < distance; i += brushRadius / 3) { 
+                    const x = x1 + Math.cos(angle) * i;
+                    const y = y1 + Math.sin(angle) * i;
+                    drawAtPoint(x, y);
+                }
+                drawAtPoint(x2, y2);
+            }
+
+            function drawAtPoint(x, y) {
+                if (isTextureBrush) {
+                    const density = 0.5; 
+                    const numPoints = Math.floor(Math.PI * brushRadius * brushRadius * density / 100); 
+                    for (let i = 0; i < numPoints; i++) {
+                        const angle = Math.random() * Math.PI * 2;
+                        const radius = Math.sqrt(Math.random()) * brushRadius; 
+                        const pointX = x + radius * Math.cos(angle);
+                        const pointY = y + radius * Math.sin(angle);
+                        ctx.beginPath();
+                        ctx.arc(pointX, pointY, 1.5, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                } else {
+                    ctx.beginPath();
+                    ctx.arc(x, y, brushRadius, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+            
+            function drawExplosion(x, y) {
+                const explosionRadius = brushRadius * 2; 
+                const numShards = 50;
+                for (let i = 0; i < numShards; i++) {
+                    const angle = Math.random() * Math.PI * 2;
+                    const distance = Math.random() * explosionRadius;
+                    const size = 5 + Math.random() * 15; 
+                    const shardX = x + distance * Math.cos(angle);
+                    const shardY = y + distance * Math.sin(angle);
+                    ctx.clearRect(shardX, shardY, size, size);
+                }
+            }
+
+            function drawPixelShard(x, y) {
+                const shardSize = 5 + Math.random() * 10; 
+                const numShards = 5; 
+                const areaRadius = brushRadius * 1.5;
+                for (let i = 0; i < numShards; i++) {
+                    const offsetX = (Math.random() - 0.5) * areaRadius;
+                    const offsetY = (Math.random() - 0.5) * areaRadius;
+                    ctx.clearRect(x + offsetX, y + offsetY, shardSize, shardSize);
+                }
+            }
+
+            window.addEventListener('resize', () => {
+                initializeCanvas();
+            });
+            
+            sizeInput.addEventListener('input', (e) => {
+                brushRadius = parseInt(e.target.value);
+                currentSizeSpan.textContent = brushRadius;
+                updateCursor();
+            });
+
+            const loadAndInit = () => {
+                 imageLoaded = true;
+                 initializeCanvas();
+                 toggleBrushState('basic'); 
+            };
+            
+            lightModeImage.onload = loadAndInit;
+            
+            if (lightModeImage.complete && !imageLoaded) {
+                loadAndInit();
+            } else if (!imageLoaded) {
+                 setTimeout(() => {
+                    if (!imageLoaded) {
+                        imageLoaded = true; 
+                        initializeCanvas();
+                        toggleBrushState('basic');
+                    }
+                 }, 500);
+            }
+            
+            updateCursor();
+            toggleBasicButton.classList.add('active-tool');
+        });
+    </script>
+</body>
+</html>
