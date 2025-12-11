@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>스크래치 카드 및 도구 세트 (최종)</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            width: 100vw;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: #111; 
+        }
+
+        /* 캔버스 컨테이너 (높이 꽉 채움, 너비 자동) */
+        #canvas-container {
+            position: relative;
+            height: 100vh; 
+            width: auto;   
+            /* 초기 비율 설정 (JS에서 이미지 비율로 덮어씌워짐) */
+            aspect-ratio: 1414 / 2000; 
+
+            box-shadow: 0 0 50px rgba(0,0,0,0.8); 
+            background-color: #000; 
+            
+            /* 다크 모드 이미지 (배경) */
+            background-image: url('https://github.com/user-attachments/assets/7900f748-e60d-4362-a1cd-d9b97c3621da');
+            background-size: cover; 
+            background-position: center;
+            background-repeat: no-repeat;
+        }
+
+        #scratchCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 10;
+            user-select: none;
+        }
+        
+        /* 좌측 도구 바 (항상 고정) */
+        #controls {
+            position: fixed;
+            left: 20px; 
+            top: 50%;
+            transform: translateY(-50%);
+            
+            width: 60px; 
+            padding: 20px 10px;
+            background-color: rgba(30, 30, 30, 0.95);
+            border-radius: 15px; 
+            
+            display: flex;
+            flex-direction: column; 
+            justify-content: center;
+            align-items: center;
+            gap: 15px; 
+            
+            z-index: 200; 
+            box-shadow: 2px 2px 15px rgba(0,0,0,0.5);
+        }
+
+        input[type=range] {
+            writing-mode: bt-lr; 
+            -webkit-appearance: slider-vertical; 
+            width: 8px;
+            height: 100px; 
+            margin: 10px 0;
+            cursor: pointer;
+        }
+
+        /* 정보 버튼 (i) */
+        #infoButton {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            width: 40px;
+            height: 40px;
+            background-color: rgba(0, 0, 0, 0.3); 
+            color: white;
+            border: 2px solid rgba(255, 255, 255, 0.7);
+            border-radius: 50%;
+            font-size: 20px;
+            font-weight: bold;
+            font-family: serif;
+            cursor: help;
+            z-index: 300;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: 0.3s;
+            backdrop-filter: blur(5px);
+        }
+        
+        #infoButton:hover {
+            background-color: white;
+            color: black;
+            border-color: white;
+        }
+
+        /* 정보 툴팁 */
+        #infoTooltip {
+            position: fixed;
+            top: 70px;
+            right: 20px;
+            width: 300px;
+            padding: 20px;
+            background-color: rgba(20, 20, 20, 0.95);
+            color: #eee;
+            border: 1px solid #444;
+            border-radius: 10px;
+            font-family: sans-serif;
+            font-size: 14px;
+            line-height: 1.6;
+            z-index: 300;
+            display: none; 
+            box-shadow: 0 5px 20px rgba(0,0,0,0.6);
+            text-align: left;
+            word-break: keep-all; 
+        }
+
+        #infoTooltip h3 {
+            margin-top: 0;
+            color: #fff;
+            font-size: 18px;
+            border-bottom: 1px solid #555;
+            padding-bottom: 10px;
+            margin-bottom: 12px;
+        }
+
+        #infoButton:hover + #infoTooltip {
+            display: block;
+        }
+        
+        /* 버튼 스타일 */
+        #toggleLoupe, #toggleBasic, #toggleTexture, #toggleEffect, #resetButton {
+            width: 40px; 
+            height: 40px; 
+            padding: 0;
+            background-color: #444;
+            color: white;
+            border: 2px solid #555;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 20px; 
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: background-color 0.2s;
+        }
+
+        #toggleLoupe:hover, #toggleBasic:hover, #toggleTexture:hover, #toggleEffect:hover, #resetButton:hover {
+            background-color: #666;
+            border-color: #888;
+        }
+        
+        .active-tool {
+            background-color: #3498db !important; 
+            border-color: #3498db !important;
+            box-shadow: 0 0 10px rgba(52, 152, 219, 0.5);
+        }
+
+        /* 돋보기 (Loupe) 스타일 */
+        #loupe {
+            position: fixed;
+            width: 300px; 
+            height: 300px; 
+            border-radius: 50%;
+            border: none; 
+            /* 부드러운 블러 테두리 */
+            box-shadow: inset 0 0 50px 30px rgba(0, 0, 0, 0.8), 
+                        0 0 20px rgba(0,0,0,0.5); 
+            overflow: hidden;
+            pointer-events: none; 
+            z-index: 100;
+            display: none;
+            background-color: transparent;
+        }
+
+        /* 돋보기 내부 배경 (중립 이미지) */
+        #loupe-background {
+            background-image: url('https://i.postimg.cc/RFBNXcbT/junglib.png');
+            background-repeat: no-repeat;
+            /* fixed 제거, size/position은 JS에서 제어 */
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            z-index: -1; 
+        }
+        
+        #currentSize {
+            color: #ddd;
+            font-size: 12px;
+            text-align: center;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="canvas-container">
+        <canvas id="scratchCanvas"></canvas>
+    </div>
+
+    <div id="loupe">
+        <div id="loupe-background"></div> 
+    </div>
+
+    <div id="infoButton">i</div>
+    <div id="infoTooltip">
+        <h3>알고리즘의 이면</h3>
+        <p>민음사 『플랫폼』 에서 ‘알고리즘에 대한 자세’ 챕터를 기반으로 만든 프로젝트입니다.</p>
+        <p>알고리즘은 우리의 선택을 돕지만 동시에 선택을 한정 짓게 합니다. 이 페이지는 알고리즘이 제공하는 편리함 뒤에 숨겨진 기준과 작동 원리를 탐색합니다.</p>
+        <p>추천이 좋아서 본 것인지, 먼저 보이기 때문에 소비한 것인지 구분하기 위해 우리는 기술이 만든 구조를 투명하게 바라볼 필요가 있습니다.</p>
+    </div>
+
+    <div id="controls">
+        <button id="toggleBasic" title="기본 브러시">🖌️</button> 
+        <button id="toggleTexture" title="텍스처 브러시">⚫</button> 
+        <button id="toggleEffect" title="이펙트 브러시">💥</button> 
+
+        <div style="width: 40px; height: 1px; background: #555; margin: 2px 0;"></div>
+
+        <button id="toggleLoupe" title="돋보기 (중립 페이지)">🔎</button>
+
+        <div style="width: 40px; height: 1px; background: #555; margin: 2px 0;"></div>
+
+        <input type="range" id="brushSize" name="brushSize" min="10" max="100" value="50" orient="vertical">
+        <span id="currentSize">50</span>
+
+        <div style="width: 40px; height: 1px; background: #555; margin: 2px 0;"></div>
+
+        <button id="resetButton" title="초기화">🔄</button> 
+    </div>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const canvasContainer = document.getElementById('canvas-container');
+            const canvas = document.getElementById('scratchCanvas');
+            const ctx = canvas.getContext('2d');
+
+            let lightModeImage = new Image();
+            lightModeImage.crossOrigin = "Anonymous"; 
+            lightModeImage.src = 'https://i.imgur.com/wCB3iXx.jpeg';
+
+            let neutralImage = new Image();
+            neutralImage.crossOrigin = "Anonymous";
+            neutralImage.src = 'https://i.postimg.cc/RFBNXcbT/junglib.png'; 
+
+            const sizeInput = document.getElementById('brushSize');
+            const currentSizeSpan = document.getElementById('currentSize');
+            let brushRadius = parseInt(sizeInput.value);
+
+            const resetButton = document.getElementById('resetButton');
+            const toggleBasicButton = document.getElementById('toggleBasic');
+            const toggleTextureButton = document.getElementById('toggleTexture');
+            const toggleEffectButton = document.getElementById('toggleEffect');
+            const toggleLoupeButton = document.getElementById('toggleLoupe');
+            
+            const loupe = document.getElementById('loupe');
+            const loupeBackground = document.getElementById('loupe-background');
+            const loupeSize = 300; 
+
+            let isBasicBrush = true; 
+            let isTextureBrush = false; 
+            let isEffectBrush = false; 
+            let isLoupeActive = false; 
+            let isDrawing = false;
+            let imageLoaded = false;
+            
+            function initializeCanvas() {
+                const dpr = window.devicePixelRatio || 1;
+                
+                // 이미지 비율 설정
+                if (lightModeImage.complete && lightModeImage.naturalWidth > 0) {
+                    const imgRatio = lightModeImage.naturalWidth / lightModeImage.naturalHeight;
+                    canvasContainer.style.aspectRatio = `${imgRatio}`;
+                }
+
+                // 컨테이너 크기 계산
+                const displayWidth = canvasContainer.offsetWidth;
+                const displayHeight = canvasContainer.offsetHeight;
+
+                canvas.style.width = displayWidth + 'px';
+                canvas.style.height = displayHeight + 'px';
+
+                canvas.width = displayWidth * dpr;
+                canvas.height = displayHeight * dpr;
+
+                ctx.scale(dpr, dpr);
+                ctx.imageSmoothingEnabled = false; 
+
+                if (imageLoaded) {
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    
+                    const img = lightModeImage;
+                    ctx.drawImage(img, 0, 0, displayWidth, displayHeight);
+                    ctx.globalCompositeOperation = 'destination-out';
+                }
+                updateCursor();
+            }
+
+            function updateCursor() {
+                const cursorRadius = brushRadius;
+                const svgWidth = cursorRadius * 2 + 4;
+                const svgHeight = cursorRadius * 2 + 4;
+                const centerX = cursorRadius + 2;
+                const centerY = cursorRadius + 2;
+                const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${svgWidth}" height="${svgHeight}" viewBox="0 0 ${svgWidth} ${svgHeight}"><circle cx="${centerX}" cy="${centerY}" r="${cursorRadius}" stroke="white" stroke-width="2" fill="none"/></svg>`;
+                const encodedSvg = encodeURIComponent(svg);
+                const cursorOffsetX = centerX;
+                const cursorOffsetY = centerY;
+
+                if (isLoupeActive) {
+                    canvas.style.cursor = `none`;
+                    return;
+                }
+
+                if (isBasicBrush) {
+                    canvas.style.cursor = `url('data:image/svg+xml;utf8,${encodedSvg}') ${cursorOffsetX} ${cursorOffsetY}, auto`;
+                } else if (isTextureBrush || isEffectBrush) {
+                    canvas.style.cursor = 'crosshair'; 
+                } else {
+                    canvas.style.cursor = 'default';
+                }
+            }
+            
+            function toggleBrushState(type) {
+                isBasicBrush = false;
+                isTextureBrush = false;
+                isEffectBrush = false;
+
+                toggleBasicButton.classList.remove('active-tool');
+                toggleTextureButton.classList.remove('active-tool');
+                toggleEffectButton.classList.remove('active-tool');
+                
+                if (type === 'basic') {
+                    isBasicBrush = true;
+                    toggleBasicButton.classList.add('active-tool');
+                } else if (type === 'texture') {
+                    isTextureBrush = true;
+                    toggleTextureButton.classList.add('active-tool');
+                } else if (type === 'effect') {
+                    isEffectBrush = true;
+                    toggleEffectButton.classList.add('active-tool');
+                }
+                updateCursor();
+            }
+
+            toggleBasicButton.addEventListener('click', () => { 
+                isLoupeActive = false; 
+                toggleLoupeButton.classList.remove('active-tool');
+                loupe.style.display = 'none';
+                canvas.style.pointerEvents = 'auto';
+                toggleBrushState('basic'); 
+            });
+            
+            toggleTextureButton.addEventListener('click', () => { 
+                isLoupeActive = false; 
+                toggleLoupeButton.classList.remove('active-tool');
+                loupe.style.display = 'none';
+                canvas.style.pointerEvents = 'auto';
+                toggleBrushState('texture'); 
+            });
+            
+            toggleEffectButton.addEventListener('click', () => { 
+                isLoupeActive = false; 
+                toggleLoupeButton.classList.remove('active-tool');
+                loupe.style.display = 'none';
+                canvas.style.pointerEvents = 'auto';
+                toggleBrushState('effect'); 
+            });
+
+            toggleLoupeButton.addEventListener('click', () => {
+                isLoupeActive = !isLoupeActive; 
+                
+                if (isLoupeActive) {
+                     toggleLoupeButton.classList.add('active-tool');
+                     loupe.style.display = 'block';
+                     toggleBrushState(null); 
+                     canvas.style.pointerEvents = 'none'; 
+                     
+                     if (neutralImage.complete) {
+                         // 초기 로드 시 이미지 세팅 (필요시)
+                     }
+                } else {
+                     toggleLoupeButton.classList.remove('active-tool');
+                     loupe.style.display = 'none';
+                     toggleBrushState('basic'); 
+                     canvas.style.pointerEvents = 'auto';
+                }
+                updateCursor();
+            });
+            
+            resetButton.addEventListener('click', () => {
+                initializeCanvas(); 
+                toggleBrushState('basic');
+                isLoupeActive = false;
+                toggleLoupeButton.classList.remove('active-tool');
+                loupe.style.display = 'none';
+                canvas.style.pointerEvents = 'auto';
+            });
+
+            let lastMouseX = -1, lastMouseY = -1;
+            canvas.addEventListener('mousedown', (e) => {
+                if (isLoupeActive) return; 
+                isDrawing = true;
+                if (isEffectBrush) {
+                    drawExplosion(e.clientX, e.clientY);
+                    isDrawing = false; 
+                }
+            });
+
+            canvas.addEventListener('mouseup', () => {
+                isDrawing = false;
+                lastMouseX = -1; lastMouseY = -1;
+            });
+
+            const handleMouseMove = (e) => {
+                const x = e.clientX;
+                const y = e.clientY;
+
+                if (isLoupeActive) {
+                    // 1. 돋보기 틀 이동
+                    const lx = x - (loupeSize / 2);
+                    const ly = y - (loupeSize / 2);
+                    loupe.style.left = `${lx}px`;
+                    loupe.style.top = `${ly}px`;
+
+                    // 2. 🆕 돋보기 배경 위치 및 크기 완벽 싱크
+                    const containerRect = canvasContainer.getBoundingClientRect();
+                    
+                    // 배경 크기는 캔버스 컨테이너와 동일하게
+                    loupeBackground.style.backgroundSize = `${containerRect.width}px ${containerRect.height}px`;
+                    
+                    // 배경 위치: 컨테이너의 시작점(containerRect.left, top)에서 
+                    // 현재 돋보기의 위치(lx, ly)를 뺀 만큼 이동해야 딱 맞음
+                    const bgX = containerRect.left - lx;
+                    const bgY = containerRect.top - ly;
+                    
+                    loupeBackground.style.backgroundPosition = `${bgX}px ${bgY}px`;
+                    
+                    return;
+                }
+                
+                // 브러시 그리기 (좌표 보정)
+                const rect = canvas.getBoundingClientRect();
+                const canvasX = x - rect.left;
+                const canvasY = y - rect.top;
+
+                if (isDrawing && isEffectBrush) {
+                    drawPixelShard(canvasX, canvasY);
+                } else if (isDrawing) {
+                    if (lastMouseX !== -1) {
+                        drawSmooth(lastMouseX, lastMouseY, canvasX, canvasY);
+                    } else {
+                        drawAtPoint(canvasX, canvasY);
+                    }
+                }
+                lastMouseX = canvasX;
+                lastMouseY = canvasY;
+            };
+
+            document.body.addEventListener('mousemove', handleMouseMove);
+            
+            function drawSmooth(x1, y1, x2, y2) {
+                const distance = Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
+                const angle = Math.atan2(y2 - y1, x2 - x1);
+                
+                for (let i = 0; i < distance; i += brushRadius / 3) { 
+                    const x = x1 + Math.cos(angle) * i;
+                    const y = y1 + Math.sin(angle) * i;
+                    drawAtPoint(x, y);
+                }
+                drawAtPoint(x2, y2);
+            }
+
+            function drawAtPoint(x, y) {
+                if (isTextureBrush) {
+                    const density = 0.5; 
+                    const numPoints = Math.floor(Math.PI * brushRadius * brushRadius * density / 100); 
+                    for (let i = 0; i < numPoints; i++) {
+                        const angle = Math.random() * Math.PI * 2;
+                        const radius = Math.sqrt(Math.random()) * brushRadius; 
+                        const pointX = x + radius * Math.cos(angle);
+                        const pointY = y + radius * Math.sin(angle);
+                        ctx.beginPath();
+                        ctx.arc(pointX, pointY, 1.5, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                } else {
+                    ctx.beginPath();
+                    ctx.arc(x, y, brushRadius, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+            
+            function drawExplosion(x, y) {
+                const explosionRadius = brushRadius * 2; 
+                const numShards = 50;
+                for (let i = 0; i < numShards; i++) {
+                    const angle = Math.random() * Math.PI * 2;
+                    const distance = Math.random() * explosionRadius;
+                    const size = 5 + Math.random() * 15; 
+                    const shardX = x + distance * Math.cos(angle);
+                    const shardY = y + distance * Math.sin(angle);
+                    ctx.clearRect(shardX, shardY, size, size);
+                }
+            }
+
+            function drawPixelShard(x, y) {
+                const shardSize = 5 + Math.random() * 10; 
+                const numShards = 5; 
+                const areaRadius = brushRadius * 1.5;
+                for (let i = 0; i < numShards; i++) {
+                    const offsetX = (Math.random() - 0.5) * areaRadius;
+                    const offsetY = (Math.random() - 0.5) * areaRadius;
+                    ctx.clearRect(x + offsetX, y + offsetY, shardSize, shardSize);
+                }
+            }
+
+            window.addEventListener('resize', () => {
+                initializeCanvas();
+            });
+            
+            sizeInput.addEventListener('input', (e) => {
+                brushRadius = parseInt(e.target.value);
+                currentSizeSpan.textContent = brushRadius;
+                updateCursor();
+            });
+
+            const loadAndInit = () => {
+                 imageLoaded = true;
+                 initializeCanvas();
+                 toggleBrushState('basic'); 
+            };
+            
+            lightModeImage.onload = loadAndInit;
+            
+            if (lightModeImage.complete && !imageLoaded) {
+                loadAndInit();
+            } else if (!imageLoaded) {
+                 setTimeout(() => {
+                    if (!imageLoaded) {
+                        imageLoaded = true; 
+                        initializeCanvas();
+                        toggleBrushState('basic');
+                    }
+                 }, 500);
+            }
+            
+            updateCursor();
+            toggleBasicButton.classList.add('active-tool');
+        });
+    </script>
+</body>
+</html>
